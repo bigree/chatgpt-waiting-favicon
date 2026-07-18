@@ -89,23 +89,9 @@
     return patterns.some((pattern) => text.includes(pattern));
   }
 
-  function hasVisibleStatusLabel() {
-    const statusPatterns = [
-      "思考中",
-      "thinking",
-      "reasoning",
-      "responding",
-      "generating"
-    ];
-    const nodes = Array.from(document.querySelectorAll("span, div, p")).filter(visible);
-    return nodes.some((node) => {
-      const text = (node.textContent || "").trim().toLowerCase();
-      return text.length <= 40 && statusPatterns.some((pattern) => text.includes(pattern));
-    });
-  }
-
   function isGenerating() {
-    if (document.querySelector('[data-testid="stop-button"], [data-testid*="stop-button"]')) {
+    const testIdStopButton = document.querySelector('[data-testid="stop-button"], [data-testid*="stop-button"]');
+    if (visible(testIdStopButton)) {
       return true;
     }
 
@@ -122,22 +108,7 @@
     ]));
     if (stopButton) return true;
 
-    if (hasVisibleStatusLabel()) return true;
-
-    const submitButtons = buttons.filter((button) => visible(button) && textMatches(button, [
-      "send prompt",
-      "send message",
-      "メッセージを送信",
-      "送信"
-    ]));
-    if (submitButtons.some((button) => button.disabled || button.getAttribute("aria-disabled") === "true")) {
-      const composer = document.querySelector("form, main");
-      if (composer && /generating|streaming|responding|thinking|reasoning|回答|生成|停止|思考中/i.test(composer.textContent || "")) {
-        return true;
-      }
-    }
-
-    return Boolean(document.querySelector('[data-testid*="stop"], [aria-live="polite"] .result-streaming, .result-streaming'));
+    return false;
   }
 
   function applyState(nextWaiting) {
