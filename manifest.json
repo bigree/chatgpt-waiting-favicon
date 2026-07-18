@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ChatGPT Waiting Favicon",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Changes the ChatGPT tab favicon while an answer is being generated.",
   "content_scripts": [
     {

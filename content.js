@@ -38,6 +38,12 @@
     return href === WAITING_ICON || href.includes("f59e0b") || href.includes("%23f59e0b");
   }
 
+  function hasWaitingFavicon() {
+    return faviconLinks().some((link) => {
+      return link.matches('[data-chatgpt-waiting-favicon="true"]') || isWaitingIconHref(link.href);
+    });
+  }
+
   function snapshotOriginalIcons() {
     if (originalIconSpecs) return;
     originalIconSpecs = faviconLinks()
@@ -125,23 +131,32 @@
     }
 
     const buttons = Array.from(document.querySelectorAll("button"));
-    const stopButton = buttons.find((button) => visible(button) && textMatches(button, [
+    const stopButton = buttons.find((button) => {
+      if (!visible(button)) return false;
+      const label = [
+        button.getAttribute("aria-label"),
+        button.getAttribute("title")
+      ].filter(Boolean).join(" ").toLowerCase();
+      return [
       "stop generating",
       "stop streaming",
       "stop response",
       "stop responding",
       "回答を停止",
-      "停止",
       "生成を停止",
       "ストリーミングを停止"
-    ]));
+      ].some((pattern) => label.includes(pattern));
+    });
     if (stopButton) return true;
 
     return false;
   }
 
   function applyState(nextWaiting) {
-    if (waiting === nextWaiting) return;
+    if (waiting === nextWaiting) {
+      if (!nextWaiting && hasWaitingFavicon()) restoreFavicon(IDLE_ICON);
+      return;
+    }
     waiting = nextWaiting;
     document.documentElement.dataset.chatgptWaitingFavicon = waiting ? "waiting" : "idle";
     if (waiting) setFavicon(WAITING_ICON);
