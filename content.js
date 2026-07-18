@@ -3,7 +3,7 @@
   const IDLE_ICON = null;
   const CHECK_INTERVAL_MS = 750;
 
-  let originalIcons = null;
+  let originalIconSpecs = null;
   let waiting = false;
   let debounceTimer = null;
 
@@ -29,14 +29,33 @@
     return Array.from(document.querySelectorAll('link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'));
   }
 
+  function normalFaviconHref() {
+    return new URL("/favicon.ico", window.location.origin).href;
+  }
+
+  function isWaitingIconHref(href) {
+    if (!href) return false;
+    return href === WAITING_ICON || href.includes("f59e0b") || href.includes("%23f59e0b");
+  }
+
   function snapshotOriginalIcons() {
-    if (originalIcons) return;
-    originalIcons = faviconLinks().map((link) => ({
-      link,
-      href: link.getAttribute("href"),
+    if (originalIconSpecs) return;
+    originalIconSpecs = faviconLinks()
+      .filter((link) => !link.matches('[data-chatgpt-waiting-favicon="true"]'))
+      .map((link) => ({
+      href: isWaitingIconHref(link.href) ? normalFaviconHref() : link.getAttribute("href"),
       rel: link.getAttribute("rel"),
+      sizes: link.getAttribute("sizes"),
       type: link.getAttribute("type")
     }));
+    if (originalIconSpecs.length === 0) {
+      originalIconSpecs = [{
+        href: normalFaviconHref(),
+        rel: "icon",
+        sizes: null,
+        type: "image/x-icon"
+      }];
+    }
   }
 
   function setFavicon(href) {
@@ -58,18 +77,28 @@
   }
 
   function restoreFavicon() {
-    const injected = document.querySelector('link[data-chatgpt-waiting-favicon="true"]');
-    if (injected) injected.remove();
-    if (!originalIcons) return;
+    snapshotOriginalIcons();
+    for (const link of faviconLinks()) {
+      if (link.matches('[data-chatgpt-waiting-favicon="true"]') || isWaitingIconHref(link.href)) {
+        link.remove();
+      }
+    }
 
-    for (const item of originalIcons) {
-      if (!item.link.isConnected) continue;
-      if (item.href === null) item.link.removeAttribute("href");
-      else item.link.setAttribute("href", item.href);
-      if (item.rel === null) item.link.removeAttribute("rel");
-      else item.link.setAttribute("rel", item.rel);
-      if (item.type === null) item.link.removeAttribute("type");
-      else item.link.setAttribute("type", item.type);
+    const specs = originalIconSpecs && originalIconSpecs.length > 0 ? originalIconSpecs : [{
+      href: normalFaviconHref(),
+      rel: "icon",
+      sizes: null,
+      type: "image/x-icon"
+    }];
+
+    for (const spec of specs) {
+      const link = document.createElement("link");
+      link.rel = spec.rel || "icon";
+      if (spec.href) link.href = isWaitingIconHref(spec.href) ? normalFaviconHref() : spec.href;
+      else link.href = normalFaviconHref();
+      if (spec.sizes) link.setAttribute("sizes", spec.sizes);
+      if (spec.type) link.type = spec.type;
+      document.head.appendChild(link);
     }
   }
 
