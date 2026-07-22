@@ -144,6 +144,14 @@
     return patterns.some((pattern) => text.includes(pattern));
   }
 
+  function hasVisibleShortText(patterns) {
+    const nodes = Array.from(document.querySelectorAll("span, div, p")).filter(visible);
+    return nodes.some((node) => {
+      const text = (node.textContent || "").trim().toLowerCase();
+      return text.length > 0 && text.length <= 80 && patterns.some((pattern) => text.includes(pattern));
+    });
+  }
+
   function userIsViewingTab() {
     return document.visibilityState === "visible" && document.hasFocus();
   }
@@ -182,6 +190,30 @@
     if (stopButton) return true;
 
     return false;
+  }
+
+  function isUploading() {
+    const visibleProgress = Array.from(document.querySelectorAll('[role="progressbar"], progress')).some(visible);
+    if (visibleProgress) return true;
+
+    const busyElement = Array.from(document.querySelectorAll('[aria-busy="true"]')).some(visible);
+    if (busyElement) return true;
+
+    const visibleSpinner = Array.from(document.querySelectorAll(".animate-spin, .motion-safe\\:animate-spin, [class*='spinner']")).some(visible);
+    if (visibleSpinner) return true;
+
+    return hasVisibleShortText([
+      "uploading",
+      "upload in progress",
+      "アップロード中",
+      "アップロードしています",
+      "処理中",
+      "ファイルを処理中"
+    ]);
+  }
+
+  function isBusy() {
+    return isGenerating() || isUploading();
   }
 
   function acknowledgeDoneIfViewed() {
@@ -226,7 +258,7 @@
 
   function scheduleCheck() {
     window.clearTimeout(debounceTimer);
-    debounceTimer = window.setTimeout(() => applyState(isGenerating()), 120);
+    debounceTimer = window.setTimeout(() => applyState(isBusy()), 120);
   }
 
   const observer = new MutationObserver(scheduleCheck);

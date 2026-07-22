@@ -1,12 +1,12 @@
 # ChatGPT Waiting Favicon
 
-Chrome extension that changes the ChatGPT tab favicon while ChatGPT is generating or thinking.
+Chrome extension that changes the ChatGPT tab favicon while ChatGPT is responding or uploading files.
 
 ## What It Does
 
-- Watches ChatGPT pages for active response states.
-- Changes the tab favicon to a yellow waiting icon while ChatGPT is responding.
-- Plays a short sound when the response finishes.
+- Changes the favicon to a yellow waiting icon while ChatGPT is generating a response.
+- Changes the favicon to the same yellow waiting icon while a file upload is running.
+- Plays a short sound when the response or upload finishes.
 - Changes the favicon to a green done icon until you view the tab.
 - Restores the original favicon after you focus the completed ChatGPT tab.
 - Runs only on `chatgpt.com` and `chat.openai.com`.
@@ -29,7 +29,7 @@ Chrome extension that changes the ChatGPT tab favicon while ChatGPT is generatin
 
 ## Notes
 
-ChatGPT's DOM changes over time. If detection stops working, update `isGenerating()` in `content.js`.
+ChatGPT's DOM changes over time. If detection stops working, update `isGenerating()` or `isUploading()` in `content.js`.
 
 ## License
 
