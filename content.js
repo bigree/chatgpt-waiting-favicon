@@ -1,10 +1,11 @@
 (() => {
   const WAITING_ICON = makeIcon("#f59e0b", "#111827", "...");
+  const DONE_ICON = makeDoneIcon("#22c55e", "#ffffff");
   const IDLE_ICON = null;
   const CHECK_INTERVAL_MS = 750;
 
   let originalIconSpecs = null;
-  let waiting = false;
+  let state = "idle";
   let debounceTimer = null;
 
   function makeIcon(background, foreground, label) {
@@ -25,6 +26,16 @@
     return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   }
 
+  function makeDoneIcon(background, foreground) {
+    const svg = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+        <rect width="64" height="64" rx="14" fill="${background}"/>
+        <path d="M18 33.5 28 43l19-23" fill="none" stroke="${foreground}" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        <title>done</title>
+      </svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  }
+
   function faviconLinks() {
     return Array.from(document.querySelectorAll('link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]'));
   }
@@ -38,18 +49,27 @@
     return href === WAITING_ICON || href.includes("f59e0b") || href.includes("%23f59e0b");
   }
 
-  function hasWaitingFavicon() {
+  function isDoneIconHref(href) {
+    if (!href) return false;
+    return href === DONE_ICON || href.includes("22c55e") || href.includes("%2322c55e");
+  }
+
+  function isStatusIconHref(href) {
+    return isWaitingIconHref(href) || isDoneIconHref(href);
+  }
+
+  function hasStatusFavicon() {
     return faviconLinks().some((link) => {
-      return link.matches('[data-chatgpt-waiting-favicon="true"]') || isWaitingIconHref(link.href);
+      return link.matches('[data-chatgpt-status-favicon="true"], [data-chatgpt-waiting-favicon="true"]') || isStatusIconHref(link.href);
     });
   }
 
   function snapshotOriginalIcons() {
     if (originalIconSpecs) return;
     originalIconSpecs = faviconLinks()
-      .filter((link) => !link.matches('[data-chatgpt-waiting-favicon="true"]'))
+      .filter((link) => !link.matches('[data-chatgpt-status-favicon="true"], [data-chatgpt-waiting-favicon="true"]'))
       .map((link) => ({
-      href: isWaitingIconHref(link.href) ? normalFaviconHref() : link.getAttribute("href"),
+      href: isStatusIconHref(link.href) ? normalFaviconHref() : link.getAttribute("href"),
       rel: link.getAttribute("rel"),
       sizes: link.getAttribute("sizes"),
       type: link.getAttribute("type")
@@ -67,10 +87,10 @@
   function setFavicon(href) {
     snapshotOriginalIcons();
     const links = faviconLinks();
-    let link = document.querySelector('link[data-chatgpt-waiting-favicon="true"]');
+    let link = document.querySelector('link[data-chatgpt-status-favicon="true"]');
     if (!link) {
       link = document.createElement("link");
-      link.setAttribute("data-chatgpt-waiting-favicon", "true");
+      link.setAttribute("data-chatgpt-status-favicon", "true");
       document.head.appendChild(link);
     }
 
@@ -85,7 +105,7 @@
   function restoreFavicon() {
     snapshotOriginalIcons();
     for (const link of faviconLinks()) {
-      if (link.matches('[data-chatgpt-waiting-favicon="true"]') || isWaitingIconHref(link.href)) {
+      if (link.matches('[data-chatgpt-status-favicon="true"], [data-chatgpt-waiting-favicon="true"]') || isStatusIconHref(link.href)) {
         link.remove();
       }
     }
@@ -100,7 +120,7 @@
     for (const spec of specs) {
       const link = document.createElement("link");
       link.rel = spec.rel || "icon";
-      if (spec.href) link.href = isWaitingIconHref(spec.href) ? normalFaviconHref() : spec.href;
+      if (spec.href) link.href = isStatusIconHref(spec.href) ? normalFaviconHref() : spec.href;
       else link.href = normalFaviconHref();
       if (spec.sizes) link.setAttribute("sizes", spec.sizes);
       if (spec.type) link.type = spec.type;
@@ -122,6 +142,18 @@
       el.textContent
     ].filter(Boolean).join(" ").toLowerCase();
     return patterns.some((pattern) => text.includes(pattern));
+  }
+
+  function userIsViewingTab() {
+    return document.visibilityState === "visible" && document.hasFocus();
+  }
+
+  function playCompleteSound() {
+    try {
+      chrome.runtime.sendMessage({ type: "chatgpt-waiting-favicon:complete" });
+    } catch (_) {
+      // Sound is best-effort; favicon state should never depend on it.
+    }
   }
 
   function isGenerating() {
@@ -152,15 +184,44 @@
     return false;
   }
 
+  function acknowledgeDoneIfViewed() {
+    if (state !== "done" || !userIsViewingTab()) return;
+    state = "idle";
+    document.documentElement.dataset.chatgptWaitingFavicon = "idle";
+    restoreFavicon(IDLE_ICON);
+  }
+
   function applyState(nextWaiting) {
-    if (waiting === nextWaiting) {
-      if (!nextWaiting && hasWaitingFavicon()) restoreFavicon(IDLE_ICON);
+    if (nextWaiting) {
+      if (state !== "waiting") {
+        state = "waiting";
+        document.documentElement.dataset.chatgptWaitingFavicon = "waiting";
+      }
+      setFavicon(WAITING_ICON);
       return;
     }
-    waiting = nextWaiting;
-    document.documentElement.dataset.chatgptWaitingFavicon = waiting ? "waiting" : "idle";
-    if (waiting) setFavicon(WAITING_ICON);
-    else restoreFavicon(IDLE_ICON);
+
+    if (state === "waiting") {
+      playCompleteSound();
+      if (userIsViewingTab()) {
+        state = "idle";
+        document.documentElement.dataset.chatgptWaitingFavicon = "idle";
+        restoreFavicon(IDLE_ICON);
+      } else {
+        state = "done";
+        document.documentElement.dataset.chatgptWaitingFavicon = "done";
+        setFavicon(DONE_ICON);
+      }
+      return;
+    }
+
+    if (state === "done") {
+      acknowledgeDoneIfViewed();
+      if (state === "done") setFavicon(DONE_ICON);
+      return;
+    }
+
+    if (hasStatusFavicon()) restoreFavicon(IDLE_ICON);
   }
 
   function scheduleCheck() {
@@ -177,5 +238,8 @@
   });
 
   window.setInterval(scheduleCheck, CHECK_INTERVAL_MS);
+  window.addEventListener("focus", acknowledgeDoneIfViewed);
+  document.addEventListener("visibilitychange", acknowledgeDoneIfViewed);
+  window.addEventListener("pageshow", acknowledgeDoneIfViewed);
   scheduleCheck();
 })();
