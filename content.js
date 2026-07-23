@@ -144,8 +144,14 @@
     return patterns.some((pattern) => text.includes(pattern));
   }
 
-  function hasVisibleShortText(patterns) {
-    const nodes = Array.from(document.querySelectorAll("span, div, p")).filter(visible);
+  function composerRoot() {
+    const prompt = document.querySelector("#prompt-textarea");
+    return prompt ? prompt.closest("form") : document.querySelector("form");
+  }
+
+  function hasVisibleShortText(root, patterns) {
+    if (!root) return false;
+    const nodes = Array.from(root.querySelectorAll("span, div, p")).filter(visible);
     return nodes.some((node) => {
       const text = (node.textContent || "").trim().toLowerCase();
       return text.length > 0 && text.length <= 80 && patterns.some((pattern) => text.includes(pattern));
@@ -193,16 +199,19 @@
   }
 
   function isUploading() {
-    const visibleProgress = Array.from(document.querySelectorAll('[role="progressbar"], progress')).some(visible);
+    const root = composerRoot();
+    if (!root) return false;
+
+    const visibleProgress = Array.from(root.querySelectorAll('[role="progressbar"], progress')).some(visible);
     if (visibleProgress) return true;
 
-    const busyElement = Array.from(document.querySelectorAll('[aria-busy="true"]')).some(visible);
+    const busyElement = Array.from(root.querySelectorAll('[aria-busy="true"]')).some(visible);
     if (busyElement) return true;
 
-    const visibleSpinner = Array.from(document.querySelectorAll(".animate-spin, .motion-safe\\:animate-spin, [class*='spinner']")).some(visible);
+    const visibleSpinner = Array.from(root.querySelectorAll(".animate-spin, .motion-safe\\:animate-spin, [class*='spinner']")).some(visible);
     if (visibleSpinner) return true;
 
-    return hasVisibleShortText([
+    return hasVisibleShortText(root, [
       "uploading",
       "upload in progress",
       "アップロード中",
