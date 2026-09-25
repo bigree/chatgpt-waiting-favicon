@@ -183,6 +183,7 @@
         button.getAttribute("aria-label"),
         button.getAttribute("title")
       ].filter(Boolean).join(" ").toLowerCase();
+      if (label === "停止") return true;
       return [
       "stop generating",
       "stop streaming",
